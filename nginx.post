@@ -1,0 +1,17 @@
+#!/bin/bash
+# nginx post-receive hook to deploy and reload
+# github.com/benvaljean
+
+# add the following to sudoers, adjust for your needs
+# git ALL=(ALL) NOPASSWD: /usr/bin/rsync -a /var/gitea/workdir/systems/nginx/ /etc/nginx/
+# git ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload nginx
+
+cd $HOME
+mkdir workdir  #not using mkdir as it allows safer sudoers cfg
+trap "cd $HOME; rm -rf workdir" EXIT
+cd workdir
+# clone repo, adjust for your needs
+git clone file:///var/gitea/gitea-repositories/xyz.git systems
+sudo rsync -a /var/gitea/workdir/systems/nginx/ /etc/nginx/
+sudo /usr/bin/systemctl reload nginx
+journalctl --no-pager|grep systemd.*nginx|tail -1

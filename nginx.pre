@@ -1,0 +1,43 @@
+#!/bin/sh
+# nginx pre-receive hook to check for syntax errors
+# github.com/benvaljean
+
+# nginx -t needs sudo to run, add the following to sudoers
+# git ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t -c /var/gitea/workdir/check/nginx/nginx.conf
+
+REPO=$PWD
+
+check_files_in () {
+  rev=$1
+
+  # create a temporary working directory
+  cd $HOME
+  mkdir workdir #not using mktemp as it allows a safer sudoers cfg (no wildcards)
+  (
+    # arrange to clean up the working directory
+    # when the subshell exits
+    trap "cd $HOME; rm -rf workdir" EXIT
+
+    # unset GIT_DIR because it would confuse things
+    unset GIT_DIR
+
+    # clone the repository
+    cd workdir
+    env -u GIT_QUARANTINE_PATH git clone $REPO check
+
+    # checkout the specific revision we're checking
+    cd check
+    git config --global advice.detachedHead false
+    env -u GIT_QUARANTINE_PATH git checkout $rev
+
+    # perform some sort of validation.  The exit code of this 
+    # command will be the exit code of this function, so
+    # returning an error will reject the push.
+	# The specific dir is used to allow a safer sudoers cfg (no wildcards)
+    sudo /usr/sbin/nginx -t -c /var/gitea/workdir/check/nginx/nginx.conf
+  )
+}
+
+while read oldrev newrev refname; do
+  check_files_in $newrev || exit 1
+done
